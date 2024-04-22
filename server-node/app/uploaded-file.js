@@ -43,7 +43,6 @@ class UploadedFile {
         this.writePromise = this.writePromise.then(() => {
             this.uploadTime = Math.round(Date.now() / 1000);
             this.expireTime = this.uploadTime + config.file.expire;
-            //this.expireTime = null;
         });
         return this.writePromise;
     }
