@@ -183,8 +183,8 @@ router.post('/upload/finish/:uuid([0-9a-f]{32})', async ctx => {
 
 router.get('/file/:uuid([0-9a-f]{32})', async ctx => {
     const file = uploadFileMap.get(ctx.params.uuid);
-    //if (!file || Date.now() / 1000 > file.expireTime || !fs.existsSync(file.path)) {
-    if (!fs.existsSync(file.path)) {
+    if (!file || Date.now() / 1000 > file.expireTime || !fs.existsSync(file.path)) {
+    //if (!fs.existsSync(file.path)) {
         return ctx.status = 404;
     }
     ctx.attachment(file.name, {type: 'inline'});

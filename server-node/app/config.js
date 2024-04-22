@@ -21,9 +21,9 @@ if (!process.argv[2] && !fs.existsSync(defaultConfigPath)) {
             limit: 40960,
         },
         file: {
-            expire: null,
+            expire: 32140800,
             chunk: 20971520,
-            limit: 2684354560,
+            limit: 5368709120,
         },
     }, null, 4));
 }

@@ -18,3 +18,16 @@
         "limit": 268435456
     }
 }
+
+const message = {
+            event: 'receive',
+            data: {
+                id: messageQueue.counter,
+                type: 'file',
+                room: ctx.query.room,
+                name: file.name,
+                size: file.size,
+                cache: file.uuid,
+                //expire: file.expireTime,
+            },
+        };
