@@ -6,14 +6,14 @@
     ],
         "port": 9501,
         "wss": false,
-        "history": 20,
+        "history": 10,
         "auth": false
     },
     "text": {
-        "limit": 40960
+        "limit": 81920
     },
     "file": {
-        "expire": 31536000,
+        "expire": 157680000,
         "chunk": 5242880,
         "limit": 5368709120
     }
