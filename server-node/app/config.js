@@ -15,7 +15,7 @@ if (!process.argv[2] && !fs.existsSync(defaultConfigPath)) {
             prefix: '',
             key: null,
             cert: null,
-            history: 50,
+            history: 20,
             auth: false,
         },
         text: {
