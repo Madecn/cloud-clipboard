@@ -1,17 +1,20 @@
 {
     "server": {
-        "host": "127.0.0.1",
+        "host": [
+        "127.0.0.1",
+        "::1"
+    ],
         "port": 9501,
         "wss": false,
-        "history": 10,
+        "history": 150,
         "auth": false
     },
     "text": {
-        "limit": 4096
+        "limit": 81920
     },
     "file": {
-        "expire": 3600,
+        "expire": 157680000,
         "chunk": 5242880,
-        "limit": 268435456
+        "limit": 10737418240
     }
 }

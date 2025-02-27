@@ -17,7 +17,7 @@ import {
     wsBoardcast,
 } from './util.js';
 
-const historyPath = path.join(process.cwd(), 'history.json');
+const historyPath = config.server.historyFile || path.join(process.cwd(), 'history.json');
 
 const saveHistory = () => fs.promises.writeFile(historyPath, JSON.stringify({
     file: Array.from(uploadFileMap.values()).filter(e => e.expireTime > Date.now() / 1e3).map(e => ({
@@ -93,13 +93,33 @@ router.delete('/revoke/:id(\\d+)', async ctx => {
         app.ws,
         JSON.stringify({
             event: 'revoke',
-                data: {
-                    id,
-                    room: ctx.query.room,
-                },
+            data: {
+                id,
+                room: ctx.query.room,
+            },
         }),
         ctx.query.room,
     );
+    writeJSON(ctx);
+    saveHistory();
+});
+
+router.delete('/revoke/all', async ctx => {
+    const revoked = messageQueue.queue.filter(e => e.data.room === ctx.query.room);
+    messageQueue.queue = messageQueue.queue.filter(e => e.data.room !== ctx.query.room);
+    /** @type {koaWebsocket.App<Koa.DefaultState, Koa.DefaultContext>} */
+    const app = ctx.app;
+    revoked.forEach(e => wsBoardcast(
+        app.ws,
+        JSON.stringify({
+            event: 'revoke',
+            data: {
+                id: e.data.id,
+                room: ctx.query.room,
+            },
+        }),
+        ctx.query.room,
+    ));
     writeJSON(ctx);
     saveHistory();
 });

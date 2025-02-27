@@ -15,8 +15,10 @@ if (!process.argv[2] && !fs.existsSync(defaultConfigPath)) {
             prefix: '',
             key: null,
             cert: null,
-            history: 20,
+            history: 150,
             auth: false,
+            historyFile: null,
+            storageDir: null,
         },
         text: {
             limit: 81920,
@@ -41,6 +43,8 @@ if (!process.argv[2] && !fs.existsSync(defaultConfigPath)) {
  *      forceWss: [Boolean],
  *      history: Number,
  *      auth: Boolean,
+ *      historyFile: [String],
+ *      storageDir: [String],
  *  },
  *  text: {
  *      limit: Number,
