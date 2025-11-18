@@ -34,7 +34,7 @@
                                     v-on="on"
                                     icon
                                     color="grey"
-                                    :href="expired ? null : `file/${meta.cache}`"
+                                    :href="expired ? null : `file/${meta.cache}/${encodeURIComponent(meta.name)}`"
                                     :download="expired ? null : meta.name"
                                 >
                                     <v-icon>{{expired ? mdiDownloadOff : mdiDownload}}</v-icon>
@@ -57,6 +57,14 @@
                                 <span>预览</span>
                             </v-tooltip>
                         </template>
+                        <v-tooltip bottom>
+                            <template v-slot:activator="{ on }">
+                                <v-btn v-on="on" icon color="grey" @click="copyLink">
+                                    <v-icon>{{mdiLinkVariant}}</v-icon>
+                                </v-btn>
+                            </template>
+                            <span>复制链接</span>
+                        </v-tooltip>
                         <v-tooltip bottom>
                             <template v-slot:activator="{ on }">
                                 <v-btn v-on="on" icon color="grey" @click="deleteItem" :disabled="loadingPreview">
@@ -106,6 +114,7 @@ import {
     mdiDownloadOff,
     mdiClose,
     mdiImageSearchOutline,
+    mdiLinkVariant,
     mdiMovieSearchOutline,
 } from '@mdi/js';
 
@@ -130,6 +139,7 @@ export default {
             mdiDownloadOff,
             mdiClose,
             mdiImageSearchOutline,
+            mdiLinkVariant,
             mdiMovieSearchOutline,
         };
     },
@@ -155,11 +165,11 @@ export default {
             }
             this.expand = true;
             if (this.isPreviewableVideo || this.isPreviewableAudio) {
-                this.srcPreview = `file/${this.meta.cache}`;
+                this.srcPreview = `file/${this.meta.cache}/${encodeURIComponent(this.meta.name)}`;
             } else {
                 this.loadingPreview = true;
                 this.loadedPreview = 0;
-                this.$http.get(`file/${this.meta.cache}`, {
+                this.$http.get(`file/${this.meta.cache}/${encodeURIComponent(this.meta.name)}`, {
                     responseType: 'arraybuffer',
                     onDownloadProgress: e => {this.loadedPreview = e.loaded},
                 }).then(response => {
@@ -174,6 +184,11 @@ export default {
                     this.loadingPreview = false;
                 });
             }
+        },
+        copyLink() {
+            navigator.clipboard
+                .writeText(`${location.protocol}//${location.host}/content/${this.meta.id}${this.$root.room ? `?room=${this.$root.room}` : ''}`)
+                .then(() => this.$toast('复制成功'));
         },
         deleteItem() {
             this.$http.delete(`revoke/${this.meta.id}`, {

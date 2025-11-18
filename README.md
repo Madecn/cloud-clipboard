@@ -7,6 +7,7 @@
 * 使用 WebSocket 实现实时通知
 * 前端使用 [Vue 2](https://cn.vuejs.org) 和 [Vuetify](https://vuetifyjs.com/zh-Hans/) 构建
 * 后端使用 ~~[Swoole](https://www.swoole.com) 或~~ [Node.js](https://nodejs.org) ([Koa](https://github.com/koajs/koa)) 构建 ~~（两种服务端实现任选一种即可）~~
+* 除网页以外，也可以[通过 HTTP API 使用](#http-api)
 
 > [!TIP]
 >
@@ -21,9 +22,9 @@
 
 > [!NOTE]
 >
-> 我认为这个项目已经算是写完了，至少对于我自己的使用习惯来说是这样……
+> 我认为这个项目已经算是写完了，因此几乎不会考虑再加入新的功能。
 >
-> 一般情况下，这个项目不会考虑再加入新的功能。如果存在严重问题，我仍然会进行修复。
+> 如果存在无法运行之类的严重问题，我仍然会进行修复。
 
 ## 截图
 
@@ -58,30 +59,6 @@
 * 和可执行文件放在同一目录的 `config.json`
 * 在命令行中指定：`cloud-clipboard /path/to/config.json`
 
-#### 从源代码运行
-
-需要安装 [Node.js](https://nodejs.org)。
-
-```bash
-# 构建前端资源，只需要执行一次
-# 也可以直接从 Actions 下载构建好的压缩包（static），解压到 server-node/static
-cd client
-npm install
-npm run build
-
-# 运行服务端
-cd ../server-node
-npm install
-node main.js
-```
-
-配置文件是按照以下顺序尝试读取的：
-
-* 和 `main.js` 放在同一目录的 `config.json`
-* 在命令行中指定：`node main.js /path/to/config.json`
-
-服务端默认会监听本机所有网卡的 IP 地址（也可以自己设定），并在终端中显示前端界面所在的网址，使用浏览器打开即可使用。
-
 #### 使用 Docker 运行
 
 ##### 自己打包
@@ -110,9 +87,59 @@ docker container run -d -p 9501:9501 ***
 
 * [chenqiyux/lan-clip](https://hub.docker.com/r/chenqiyux/lan-clip) amd64
 * [shuaigekda123/myclip](https://hub.docker.com/r/shuaigekda123/myclip) amd64/arm64
-* [jonnyan404/cloud-clipboard](https://hub.docker.com/r/jonnyan404/cloud-clipboard) amd64/arm64/armv7  -->2025年01月06日更新
+* [jonnyan404/cloud-clipboard](https://hub.docker.com/r/jonnyan404/cloud-clipboard) amd64/arm64/armv7  -->2025年04月30日更新
+* [jonnyan404/cloud-clipboard-go](https://hub.docker.com/r/jonnyan404/cloud-clipboard-go) amd64/arm64/armv7  -->go版服务端
 
 然后访问 http://127.0.0.1:9501
+
+#### 从源代码运行
+
+需要安装 [Node.js](https://nodejs.org)。
+
+```bash
+# 构建前端资源，只需要执行一次
+# 也可以直接从 Actions 下载构建好的压缩包（static），解压到 server-node/static
+cd client
+npm install
+npm run build
+
+# 运行服务端
+cd ../server-node
+npm install
+node main.js
+```
+
+配置文件是按照以下顺序尝试读取的：
+
+* 和 `main.js` 放在同一目录的 `config.json`
+* 在命令行中指定：`node main.js /path/to/config.json`
+
+服务端默认会监听本机所有网卡的 IP 地址（也可以自己设定），并在终端中显示前端界面所在的网址，使用浏览器打开即可使用。
+
+### Python 版服务端
+
+基于 python3 sanic, 较少的依赖 (几十 MB 以内)  
+https://github.com/yurenchen000/cloud-clipboard/tree/py3/server-py3  
+
+同时也有个 go 版 server (包含捆绑的前端文件, 10MB 以内)  
+https://github.com/yurenchen000/cloud-clipboard/tree/golang/server-go
+
+### GO 版服务端
+
+https://github.com/Jonnyan404/cloud-clipboard-go
+
+-  ✅ Android 服务端应用apk
+-  ✅ 支持 CF workers+pages+D1+R2 部署
+-  ✅ 多国语言
+-  ✅ Android 快捷指令
+-  🔘 iOS 快捷指令
+-  ✅ 扫码下载 
+-  ✅ homebrew
+-  ✅ openwrt
+-  ✅ docker
+-  ✅ UI辅助器
+-  ✅ 二进制
+
 
 ### C 版服务端
 
@@ -214,3 +241,66 @@ php build-phar.php
 >
 > 如果启用“密码认证”，只有输入正确的密码才能连接到服务端并查看剪贴板内容。
 > 可以将 `server.auth` 字段设为 `true`（随机生成六位密码）或字符串（自定义密码）来启用这个功能，启动服务端后终端会以 `Authorization code: ******` 的格式输出当前使用的密码。
+
+### HTTP API
+
+#### 发送文本
+
+```console
+$ curl -H "Content-Type: text/plain" --data-binary "foobar" http://localhost:9501/text
+{"code":200,"msg":"","result":{"url":"http://localhost:9501/content/1"}}
+
+$ curl http://localhost:9501/content/1
+foobar
+```
+
+注意：请求头中不能缺少 `Content-Type: text/plain`
+
+#### 发送文件
+
+```console
+$ curl -F file=@image.png http://localhost:9501/upload
+{"code":200,"msg":"","result":{"url":"http://localhost:9501/content/2"}}
+
+$ curl http://localhost:9501/content/2
+Redirecting to <a href="http://localhost:9501/file/xxxx">http://localhost:9501/file/xxxx</a>.
+
+$ curl -L http://localhost:9501/content/2
+Warning: Binary output can mess up your terminal. Use "--output -" to tell curl to output it to your terminal anyway,
+Warning: or consider "--output <FILE>" to save to a file.
+```
+
+#### 在设定房间的情况下发送文本或文件
+
+```console
+$ curl -H "Content-Type: text/plain" --data-binary @package.json http://localhost:9501/text?room=reisen-8fce
+{"code":200,"msg":"","result":{"url":"http://localhost:9501/content/3?room=reisen-8fce"}}
+
+$ curl http://localhost:9501/content/3
+Not Found
+
+$ curl http://localhost:9501/content/3?room=suika-51ba
+Not Found
+
+$ curl http://localhost:9501/content/3?room=reisen-8fce
+{
+  "name": "cloud-clipboard-server-node",
+  ...
+}
+```
+
+#### 密码认证
+
+```console
+$ curl -H "Content-Type: text/plain" --data-binary "foobar" http://localhost:9501/text
+Forbidden
+
+$ curl -H "Authorization: Bearer xxxx" -H "Content-Type: text/plain" --data-binary "foobar" http://localhost:9501/text
+{"code":200,"msg":"","result":{"url":"http://localhost:9501/content/1"}}
+
+$ curl http://localhost:9501/content/1
+Forbidden
+
+$ curl -H "Authorization: Bearer xxxx" http://localhost:9501/content/1
+foobar
+```
