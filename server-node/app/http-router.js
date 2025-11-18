@@ -20,14 +20,19 @@ import {
 const historyPath = config.server.historyFile || path.join(process.cwd(), 'history.json');
 
 const saveHistory = () => fs.promises.writeFile(historyPath, JSON.stringify({
-    file: Array.from(uploadFileMap.values()).filter(e => e.expireTime > Date.now() / 1e3).map(e => ({
-        name: e.name,
-        uuid: e.uuid,
-        size: e.size,
-        uploadTime: e.uploadTime,
-        expireTime: e.expireTime,
-    })),
-    receive: messageQueue.queue.filter(e => e.event === 'receive').filter(e => e.data.type !== 'file' || e.data.expire > Date.now() / 1e3).map(e => e.data),
+    file: Array.from(uploadFileMap.values())
+        .filter(e => e.expireTime > Date.now() / 1e3)
+        .map(e => ({
+            name: e.name,
+            uuid: e.uuid,
+            size: e.size,
+            uploadTime: e.uploadTime,
+            expireTime: e.expireTime,
+        })),
+    receive: messageQueue.queue
+        .filter(e => e.event === 'receive')
+        .filter(e => e.data.type !== 'file' || e.data.expire > Date.now() / 1e3)
+        .map(e => e.data),
 }));
 
 /** @type {import('koa').Middleware} */
@@ -141,6 +146,112 @@ router.delete('/revoke/all', authMiddleware, async ctx => {
     writeJSON(ctx);
     saveHistory();
 });
+
+// 导出当前所有消息与文件的备份
+router.get('/backup', authMiddleware, async ctx => {
+    const currentTime = Math.round(Date.now() / 1000);
+    const files = [];
+
+    for (const file of uploadFileMap.values()) {
+        if (file.expireTime <= currentTime) continue;
+        if (!fs.existsSync(file.path)) continue;
+        const content = await fs.promises.readFile(file.path);
+        files.push({
+            name: file.name,
+            uuid: file.uuid,
+            size: file.size,
+            uploadTime: file.uploadTime,
+            expireTime: file.expireTime,
+            content: content.toString('base64'),
+        });
+    }
+
+    const messages = messageQueue.queue
+        .filter(e => e.event === 'receive')
+        .map(e => e.data);
+
+    ctx.body = {
+        version: 1,
+        createdAt: new Date().toISOString(),
+        messages,
+        files,
+    };
+});
+
+// 导入备份并替换当前所有消息与文件
+router.post(
+    '/backup',
+    authMiddleware,
+    koaBody({
+        multipart: false,
+        json: true,
+        text: false,
+        urlencoded: false,
+    }),
+    async ctx => {
+        /** @type {{version:number, messages:any[], files:any[]}} */
+        const backup = ctx.request.body || {};
+        if (backup.version !== 1) {
+            return writeJSON(ctx, 400, {}, '不支持的备份版本');
+        }
+
+        // 清空现有文件
+        try {
+            for (const file of uploadFileMap.values()) {
+                try {
+                    await file.remove();
+                } catch {}
+            }
+            uploadFileMap.clear();
+
+            if (fs.existsSync(storageFolder)) {
+                const entries = await fs.promises.readdir(storageFolder);
+                await Promise.all(entries.map(name => fs.promises.rm(path.join(storageFolder, name)).catch(() => {})));
+            }
+        } catch {}
+
+        // 重新导入文件
+        const fileMap = new Map();
+        const currentTime = Math.round(Date.now() / 1000);
+        for (const f of backup.files || []) {
+            try {
+                const file = new UploadedFile(f.name);
+                file.uuid = f.uuid;
+                file.path = path.join(storageFolder, file.uuid);
+                const buffer = Buffer.from(f.content || '', 'base64');
+                await fs.promises.writeFile(file.path, buffer);
+                file.size = typeof f.size === 'number' ? f.size : buffer.length;
+                file.uploadTime = typeof f.uploadTime === 'number' ? f.uploadTime : currentTime;
+                file.expireTime = typeof f.expireTime === 'number' ? f.expireTime : (file.uploadTime + config.file.expire);
+                uploadFileMap.set(file.uuid, file);
+                fileMap.set(file.uuid, file);
+            } catch {}
+        }
+
+        // 重新导入消息
+        messageQueue.queue = [];
+        messageQueue.counter = 0;
+        const messages = Array.isArray(backup.messages) ? backup.messages : [];
+        messages.sort((a, b) => (a.id || 0) - (b.id || 0));
+        for (const m of messages) {
+            if (m.type === 'file') {
+                if (!m.cache || !fileMap.has(m.cache)) continue;
+            }
+            const id = typeof m.id === 'number' ? m.id : messageQueue.counter;
+            messageQueue.counter = Math.max(messageQueue.counter, id + 1);
+            messageQueue.queue.push({
+                event: 'receive',
+                data: {
+                    ...m,
+                    id,
+                },
+            });
+        }
+
+        await saveHistory();
+        writeJSON(ctx);
+    }
+);
 
 router.post(
     '/upload',
