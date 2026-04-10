@@ -3,6 +3,7 @@ import VueRouter from 'vue-router';
 import Home from '@/views/Home.vue';
 import Device from '@/views/Device.vue';
 import About from '@/views/About.vue';
+import Backup from '@/views/Backup.vue';
 
 Vue.use(VueRouter);
 
@@ -25,6 +26,13 @@ const router = new VueRouter({
         {
             path: '/about',
             component: About,
+            meta: {
+                keepAlive: true,
+            },
+        },
+        {
+            path: '/backup',
+            component: Backup,
             meta: {
                 keepAlive: true,
             },

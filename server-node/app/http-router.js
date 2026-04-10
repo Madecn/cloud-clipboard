@@ -61,6 +61,64 @@ router.get('/server', async ctx => {
     };
 });
 
+// 读取当前配置（需要鉴权）
+router.get('/config', authMiddleware, async ctx => {
+    writeJSON(ctx, 200, {
+        text: config.text,
+        file: config.file,
+    });
+});
+
+// 更新部分配置（需要鉴权）
+router.post(
+    '/config',
+    authMiddleware,
+    koaBody({
+        multipart: false,
+        json: true,
+        text: false,
+        urlencoded: false,
+    }),
+    async ctx => {
+        /** @type {{text?: {limit?: number}, file?: {limit?: number, expire?: number}}} */
+        const body = ctx.request.body || {};
+        if (!body.text && !body.file) {
+            return writeJSON(ctx, 400, {}, '缺少配置内容');
+        }
+
+        if (body.text && typeof body.text.limit === 'number') {
+            const limit = Math.max(1, Math.floor(body.text.limit));
+            config.text.limit = limit;
+        }
+        if (body.file) {
+            if (typeof body.file.limit === 'number') {
+                const limit = Math.max(1, Math.floor(body.file.limit));
+                config.file.limit = limit;
+            }
+            if (typeof body.file.expire === 'number') {
+                const expire = Math.max(60, Math.floor(body.file.expire));
+                config.file.expire = expire;
+            }
+        }
+
+        /** @type {koaWebsocket.App<Koa.DefaultState, Koa.DefaultContext>} */
+        const app = ctx.app;
+        wsBoardcast(app.ws, JSON.stringify({
+            event: 'config',
+            data: {
+                version: process.env.VERSION,
+                text: config.text,
+                file: config.file,
+            },
+        }));
+
+        writeJSON(ctx, 200, {
+            text: config.text,
+            file: config.file,
+        });
+    }
+);
+
 router.post(
     '/text',
     authMiddleware,

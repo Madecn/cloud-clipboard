@@ -82,15 +82,37 @@ export default {
         };
     },
     methods: {
+        async copyToClipboard(text) {
+            try {
+                if (navigator.clipboard && window.isSecureContext) {
+                    await navigator.clipboard.writeText(text);
+                } else {
+                    const textarea = document.createElement('textarea');
+                    textarea.value = text;
+                    textarea.style.position = 'fixed';
+                    textarea.style.opacity = '0';
+                    document.body.appendChild(textarea);
+                    textarea.focus();
+                    textarea.select();
+                    const ok = document.execCommand('copy');
+                    document.body.removeChild(textarea);
+                    if (!ok) {
+                        throw new Error('execCommand 复制失败');
+                    }
+                }
+                this.$toast && this.$toast('复制成功');
+            } catch (err) {
+                console.error(err);
+                this.$toast && this.$toast.error('复制失败，可能被浏览器拦截，请手动复制');
+            }
+        },
         copyText() {
-            navigator.clipboard
-                .writeText(dp.parseFromString(this.meta.content, 'text/html').documentElement.textContent)
-                .then(() => this.$toast('复制成功'));
+            const plainText = dp.parseFromString(this.meta.content, 'text/html').documentElement.textContent;
+            this.copyToClipboard(plainText);
         },
         copyLink() {
-            navigator.clipboard
-                .writeText(`${location.protocol}//${location.host}/content/${this.meta.id}${this.$root.room ? `?room=${this.$root.room}` : ''}`)
-                .then(() => this.$toast('复制成功'));
+            const url = `${location.protocol}//${location.host}/content/${this.meta.id}${this.$root.room ? `?room=${this.$root.room}` : ''}`;
+            this.copyToClipboard(url);
         },
         deleteItem() {
             this.$http.delete(`revoke/${this.meta.id}`, {

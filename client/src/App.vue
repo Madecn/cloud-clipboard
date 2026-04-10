@@ -77,6 +77,15 @@
                     </v-list-item-content>
                 </v-list-item>
 
+                <v-list-item link href="#/backup">
+                    <v-list-item-action>
+                        <v-icon>{{mdiContentSave}}</v-icon>
+                    </v-list-item-action>
+                    <v-list-item-content>
+                        <v-list-item-title>数据备份与设置</v-list-item-title>
+                    </v-list-item-content>
+                </v-list-item>
+
                 <v-list-item link href="#/about">
                     <v-list-item-action>
                         <v-icon>{{mdiInformation}}</v-icon>
@@ -94,7 +103,7 @@
             dark
         >
             <v-app-bar-nav-icon @click.stop="drawer = !drawer" />
-            <v-toolbar-title>云剪贴板<span class="d-none d-sm-inline" v-if="$root.room">（房间：<abbr title="点击复制" style="cursor:pointer" @click="navigator.clipboard.writeText($root.room).then(() => $toast(`已复制房间名称：${$root.room}`).catch(err => $toast.error(`复制失败：${err}`)))">{{$root.room}}</abbr>）</span></v-toolbar-title>
+            <v-toolbar-title>云剪贴板<span class="d-none d-sm-inline" v-if="$root.room">（房间：<abbr title="点击复制" style="cursor:pointer" @click="copyRoomName">{{$root.room}}</abbr>）</span></v-toolbar-title>
             <v-spacer></v-spacer>
             <v-tooltip left>
                 <template v-slot:activator="{ on }">
@@ -243,6 +252,7 @@ import {
     mdiDiceMultiple,
     mdiPalette,
     mdiNotificationClearAll,
+    mdiContentSave,
 } from '@mdi/js';
 
 export default {
@@ -262,10 +272,37 @@ export default {
             mdiDiceMultiple,
             mdiPalette,
             mdiNotificationClearAll,
+            mdiContentSave,
             navigator,
         };
     },
     methods: {
+        async copyRoomName() {
+            const room = this.$root.room;
+            if (!room) return;
+            try {
+                if (navigator.clipboard && window.isSecureContext) {
+                    await navigator.clipboard.writeText(room);
+                } else {
+                    const textarea = document.createElement('textarea');
+                    textarea.value = room;
+                    textarea.style.position = 'fixed';
+                    textarea.style.opacity = '0';
+                    document.body.appendChild(textarea);
+                    textarea.focus();
+                    textarea.select();
+                    const ok = document.execCommand('copy');
+                    document.body.removeChild(textarea);
+                    if (!ok) {
+                        throw new Error('execCommand 复制失败');
+                    }
+                }
+                this.$toast && this.$toast(`已复制房间名称：${room}`);
+            } catch (err) {
+                console.error(err);
+                this.$toast && this.$toast.error(`复制失败：${err && err.message ? err.message : err}`);
+            }
+        },
         async clearAll() {
             try {
                 const files = this.$root.received.filter(e => e.type === 'file');
