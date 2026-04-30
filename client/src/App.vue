@@ -6,7 +6,7 @@
             app
         >
             <v-list>
-                <v-list-item link :href="`#/?room=${$root.room}`">
+                <v-list-item link href="#/">
                     <v-list-item-action>
                         <v-icon>{{mdiContentPaste}}</v-icon>
                     </v-list-item-action>
@@ -103,7 +103,7 @@
             dark
         >
             <v-app-bar-nav-icon @click.stop="drawer = !drawer" />
-            <v-toolbar-title>云剪贴板<span class="d-none d-sm-inline" v-if="$root.room">（房间：<abbr title="点击复制" style="cursor:pointer" @click="copyRoomName">{{$root.room}}</abbr>）</span></v-toolbar-title>
+            <v-toolbar-title>云剪贴板</v-toolbar-title>
             <v-spacer></v-spacer>
             <v-tooltip left>
                 <template v-slot:activator="{ on }">
@@ -112,14 +112,6 @@
                     </v-btn>
                 </template>
                 <span>清空剪贴板</span>
-            </v-tooltip>
-            <v-tooltip left>
-                <template v-slot:activator="{ on }">
-                    <v-btn icon v-on="on" @click="$root.roomInput = $root.room; $root.roomDialog = true">
-                        <v-icon>{{mdiBulletinBoard}}</v-icon>
-                    </v-btn>
-                </template>
-                <span>进入房间</span>
             </v-tooltip>
             <v-tooltip left>
                 <template v-slot:activator="{ on }">
@@ -177,43 +169,11 @@
             </v-card>
         </v-dialog>
 
-        <v-dialog v-model="$root.roomDialog" persistent max-width="360">
-            <v-card>
-                <v-card-title class="headline">剪贴板房间</v-card-title>
-                <v-card-text>
-                    <p>输入任意名称创建新房间，或进入已有的房间。留空则表示使用默认的全局房间。</p>
-                    <p>在房间中发送的内容仅限房间内可见，保存的历史记录数量仍然会受到全局设定的限制。</p>
-                    <v-text-field
-                        v-model="$root.roomInput"
-                        label="房间名称"
-                        :append-icon="mdiDiceMultiple"
-                        @click:append="$root.roomInput = ['reimu', 'marisa', 'rumia', 'cirno', 'meiling', 'patchouli', 'sakuya', 'remilia', 'flandre', 'letty', 'chen', 'lyrica', 'lunasa', 'merlin', 'youmu', 'yuyuko', 'ran', 'yukari', 'suika', 'mystia', 'keine', 'tewi', 'reisen', 'eirin', 'kaguya', 'mokou'][Math.floor(Math.random() * 26)] + '-' + Math.random().toString(16).substring(2, 6)"
-                    ></v-text-field>
-                </v-card-text>
-                <v-card-actions>
-                    <v-spacer></v-spacer>
-                    <v-btn
-                        color="primary darken-1"
-                        text
-                        @click="$root.roomDialog = false"
-                    >取消</v-btn>
-                    <v-btn
-                        color="primary darken-1"
-                        text
-                        @click="
-                            $router.push({ path: '/', query: { room: $root.roomInput }});
-                            $root.roomDialog = false;
-                        "
-                    >进入房间</v-btn>
-                </v-card-actions>
-            </v-card>
-        </v-dialog>
-
         <v-dialog v-model="clearAllDialog" max-width="360">
             <v-card>
                 <v-card-title class="headline">清空剪贴板</v-card-title>
                 <v-card-text>
-                    <p>是否要清空当前房间的所有剪贴板内容？</p>
+                    <p>是否要清空当前所有剪贴板内容？</p>
                 </v-card-text>
                 <v-card-actions>
                     <v-spacer></v-spacer>
@@ -248,8 +208,6 @@ import {
     mdiLanDisconnect,
     mdiLanPending,
     mdiBrightness4,
-    mdiBulletinBoard,
-    mdiDiceMultiple,
     mdiPalette,
     mdiNotificationClearAll,
     mdiContentSave,
@@ -268,8 +226,6 @@ export default {
             mdiLanDisconnect,
             mdiLanPending,
             mdiBrightness4,
-            mdiBulletinBoard,
-            mdiDiceMultiple,
             mdiPalette,
             mdiNotificationClearAll,
             mdiContentSave,
@@ -277,38 +233,10 @@ export default {
         };
     },
     methods: {
-        async copyRoomName() {
-            const room = this.$root.room;
-            if (!room) return;
-            try {
-                if (navigator.clipboard && window.isSecureContext) {
-                    await navigator.clipboard.writeText(room);
-                } else {
-                    const textarea = document.createElement('textarea');
-                    textarea.value = room;
-                    textarea.style.position = 'fixed';
-                    textarea.style.opacity = '0';
-                    document.body.appendChild(textarea);
-                    textarea.focus();
-                    textarea.select();
-                    const ok = document.execCommand('copy');
-                    document.body.removeChild(textarea);
-                    if (!ok) {
-                        throw new Error('execCommand 复制失败');
-                    }
-                }
-                this.$toast && this.$toast(`已复制房间名称：${room}`);
-            } catch (err) {
-                console.error(err);
-                this.$toast && this.$toast.error(`复制失败：${err && err.message ? err.message : err}`);
-            }
-        },
         async clearAll() {
             try {
                 const files = this.$root.received.filter(e => e.type === 'file');
-                await this.$http.delete('revoke/all', {
-                    params: { room: this.$root.room },
-                });
+                await this.$http.delete('revoke/all');
                 for (const file of files) {
                     await this.$http.delete(`file/${file.cache}`);
                 }

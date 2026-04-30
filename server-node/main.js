@@ -31,6 +31,12 @@ app.use(async (ctx, next) => {
         ?? ctx.request.header['x-forwarded-for']?.split(',').pop()?.trim()
         ?? ctx.req.socket.remoteAddress;
 
+    if (ctx.method === 'GET' && ctx.path === '/') {
+        ctx.set('Cache-Control', 'no-store, no-cache, must-revalidate, proxy-revalidate');
+        ctx.set('Pragma', 'no-cache');
+        ctx.set('Expires', '0');
+    }
+
     console.log(new Date().toISOString(), '-', remoteAddress, ctx.request.method, ctx.request.path, statusString, `${(performance.now() - startTime).toFixed(2)}ms`);
 })
 app.use(koaCompress());

@@ -5,9 +5,6 @@ export default {
             websocketConnecting: false,
             authCode: localStorage.getItem('auth') || '',
             authCodeDialog: false,
-            room: this.$router.currentRoute.query.room || '',
-            roomInput: '',
-            roomDialog: false,
             retry: 0,
             event: {
                 receive: data => {
@@ -17,6 +14,10 @@ export default {
                     this.$root.received.unshift(...Array.from(data).reverse());
                 },
                 revoke: data => {
+                    if (data.id === -1) {
+                        this.$root.received = [];
+                        return;
+                    }
                     let index = this.$root.received.findIndex(e => e.id === data.id);
                     if (index === -1) return;
                     this.$root.received.splice(index, 1);
@@ -44,12 +45,6 @@ export default {
             },
         };
     },
-    watch: {
-        room() {
-            this.disconnect();
-            this.connect();
-        },
-    },
     methods: {
         connect() {
             this.websocketConnecting = true;
@@ -72,7 +67,6 @@ export default {
                             return;
                         }
                     }
-                    wsUrl.searchParams.set('room', this.room);
                     const ws = new WebSocket(wsUrl);
                     ws.onopen = () => resolve(ws);
                     ws.onerror = reject;

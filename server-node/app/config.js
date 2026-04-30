@@ -58,6 +58,13 @@ if (!process.argv[2] && !fs.existsSync(defaultConfigPath)) {
  */
 const config = JSON.parse(fs.readFileSync(process.argv[2] || defaultConfigPath));
 
+if (process.env.STORAGE_DIR) {
+    config.server.storageDir = process.env.STORAGE_DIR;
+}
+if (process.env.HISTORY_FILE) {
+    config.server.historyFile = process.env.HISTORY_FILE;
+}
+
 if (!config.server.prefix) {
     config.server.prefix = '';
 }

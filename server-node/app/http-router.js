@@ -18,6 +18,9 @@ import {
 } from './util.js';
 
 const historyPath = config.server.historyFile || path.join(process.cwd(), 'history.json');
+if (!fs.existsSync(path.dirname(historyPath))) {
+    fs.mkdirSync(path.dirname(historyPath), { recursive: true });
+}
 
 const saveHistory = () => fs.promises.writeFile(historyPath, JSON.stringify({
     file: Array.from(uploadFileMap.values())
@@ -147,16 +150,15 @@ router.post(
             data: {
                 id: messageQueue.counter,
                 type: 'text',
-                room: ctx.query.room || '',
                 content: body,
             },
         };
         messageQueue.enqueue(message);
         /** @type {koaWebsocket.App<Koa.DefaultState, Koa.DefaultContext>} */
         const app = ctx.app;
-        wsBoardcast(app.ws, JSON.stringify(message), ctx.query.room || '');
+        wsBoardcast(app.ws, JSON.stringify(message));
         writeJSON(ctx, 200, {
-            url: `${ctx.request.protocol}://${ctx.request.host}${config.server.prefix}/content/${message.data.id}${ctx.query.room ? `?room=${encodeURIComponent(ctx.query.room)}` : ''}`,
+            url: `${ctx.request.protocol}://${ctx.request.host}${config.server.prefix}/content/${message.data.id}`,
         });
         saveHistory();
     }
@@ -176,54 +178,32 @@ router.delete('/revoke/:id(\\d+)', authMiddleware, async ctx => {
             event: 'revoke',
             data: {
                 id,
-                room: ctx.query.room || '',
             },
         }),
-        ctx.query.room || '',
     );
     writeJSON(ctx);
     saveHistory();
 });
 
 router.delete('/revoke/all', authMiddleware, async ctx => {
-    const revoked = messageQueue.queue.filter(e => e.data.room === (ctx.query.room || ''));
-    messageQueue.queue = messageQueue.queue.filter(e => e.data.room !== (ctx.query.room || ''));
+    messageQueue.queue = [];
     /** @type {koaWebsocket.App<Koa.DefaultState, Koa.DefaultContext>} */
     const app = ctx.app;
-    revoked.forEach(e => wsBoardcast(
+    wsBoardcast(
         app.ws,
         JSON.stringify({
             event: 'revoke',
             data: {
-                id: e.data.id,
-                room: ctx.query.room || '',
+                id: -1, // -1 means all
             },
         }),
-        ctx.query.room || '',
-    ));
+    );
     writeJSON(ctx);
     saveHistory();
 });
 
 // 导出当前所有消息与文件的备份
 router.get('/backup', authMiddleware, async ctx => {
-    const currentTime = Math.round(Date.now() / 1000);
-    const files = [];
-
-    for (const file of uploadFileMap.values()) {
-        if (file.expireTime <= currentTime) continue;
-        if (!fs.existsSync(file.path)) continue;
-        const content = await fs.promises.readFile(file.path);
-        files.push({
-            name: file.name,
-            uuid: file.uuid,
-            size: file.size,
-            uploadTime: file.uploadTime,
-            expireTime: file.expireTime,
-            content: content.toString('base64'),
-        });
-    }
-
     const messages = messageQueue.queue
         .filter(e => e.event === 'receive')
         .map(e => e.data);
@@ -232,7 +212,7 @@ router.get('/backup', authMiddleware, async ctx => {
         version: 1,
         createdAt: new Date().toISOString(),
         messages,
-        files,
+        files: [],
     };
 });
 
@@ -245,6 +225,7 @@ router.post(
         json: true,
         text: false,
         urlencoded: false,
+        jsonLimit: '10gb',
     }),
     async ctx => {
         /** @type {{version:number, messages:any[], files:any[]}} */
@@ -268,33 +249,13 @@ router.post(
             }
         } catch {}
 
-        // 重新导入文件
-        const fileMap = new Map();
-        const currentTime = Math.round(Date.now() / 1000);
-        for (const f of backup.files || []) {
-            try {
-                const file = new UploadedFile(f.name);
-                file.uuid = f.uuid;
-                file.path = path.join(storageFolder, file.uuid);
-                const buffer = Buffer.from(f.content || '', 'base64');
-                await fs.promises.writeFile(file.path, buffer);
-                file.size = typeof f.size === 'number' ? f.size : buffer.length;
-                file.uploadTime = typeof f.uploadTime === 'number' ? f.uploadTime : currentTime;
-                file.expireTime = typeof f.expireTime === 'number' ? f.expireTime : (file.uploadTime + config.file.expire);
-                uploadFileMap.set(file.uuid, file);
-                fileMap.set(file.uuid, file);
-            } catch {}
-        }
-
         // 重新导入消息
         messageQueue.queue = [];
         messageQueue.counter = 0;
         const messages = Array.isArray(backup.messages) ? backup.messages : [];
         messages.sort((a, b) => (a.id || 0) - (b.id || 0));
         for (const m of messages) {
-            if (m.type === 'file') {
-                if (!m.cache || !fileMap.has(m.cache)) continue;
-            }
+            if (m.type === 'file') continue;
             const id = typeof m.id === 'number' ? m.id : messageQueue.counter;
             messageQueue.counter = Math.max(messageQueue.counter, id + 1);
             messageQueue.queue.push({
@@ -341,7 +302,6 @@ router.post(
                 data: {
                     id: -1, // 在生成缩略图之后进队列之前再设定
                     type: 'file',
-                    room: ctx.query.room || '',
                     name: file.name,
                     size: file.size,
                     cache: file.uuid,
@@ -358,9 +318,9 @@ router.post(
 
             /** @type {koaWebsocket.App<Koa.DefaultState, Koa.DefaultContext>} */
             const app = ctx.app;
-            wsBoardcast(app.ws, JSON.stringify(message), ctx.query.room || '');
+            wsBoardcast(app.ws, JSON.stringify(message));
             writeJSON(ctx, 200, {
-                url: `${ctx.request.protocol}://${ctx.request.host}${config.server.prefix}/content/${message.data.id}${ctx.query.room ? `?room=${encodeURIComponent(ctx.query.room)}` : ''}`,
+                url: `${ctx.request.protocol}://${ctx.request.host}${config.server.prefix}/content/${message.data.id}`,
             });
             saveHistory();
         } catch (error) {
@@ -422,7 +382,6 @@ router.post('/upload/finish/:uuid([0-9a-f]{32})', authMiddleware, async ctx => {
             data: {
                 id: -1, // 在生成缩略图之后进队列之前再设定
                 type: 'file',
-                room: ctx.query.room || '',
                 name: file.name,
                 size: file.size,
                 cache: file.uuid,
@@ -439,9 +398,9 @@ router.post('/upload/finish/:uuid([0-9a-f]{32})', authMiddleware, async ctx => {
 
         /** @type {koaWebsocket.App<Koa.DefaultState, Koa.DefaultContext>} */
         const app = ctx.app;
-        wsBoardcast(app.ws, JSON.stringify(message), ctx.query.room || '');
+        wsBoardcast(app.ws, JSON.stringify(message));
         writeJSON(ctx, 200, {
-            url: `${ctx.request.protocol}://${ctx.request.host}${config.server.prefix}/content/${message.data.id}${ctx.query.room ? `?room=${encodeURIComponent(ctx.query.room)}` : ''}`,
+            url: `${ctx.request.protocol}://${ctx.request.host}${config.server.prefix}/content/${message.data.id}`,
         });
         saveHistory();
     } catch (error) {
@@ -502,7 +461,6 @@ router.delete('/file/:uuid([0-9a-f]{32})', authMiddleware, async ctx => {
 router.get('/content/:id([0-9]+)', authMiddleware, async ctx => {
     const message = messageQueue.queue.find(e => (
         e.event === 'receive' &&
-        e.data.room === (ctx.query.room || '') &&
         e.data.id === parseInt(ctx.params.id)
     ));
     if (!message) return ctx.status = 404;

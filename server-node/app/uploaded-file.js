@@ -7,7 +7,7 @@ import config from './config.js';
 
 const storageFolder = config.server.storageDir || path.join(os.tmpdir(), '.cloud-clipboard-storage');
 if (!fs.existsSync(storageFolder)) {
-    fs.mkdirSync(storageFolder);
+    fs.mkdirSync(storageFolder, { recursive: true });
 }
 
 class UploadedFile {
